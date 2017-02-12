@@ -1,6 +1,6 @@
 import numpy as np
 import scipy
-import theano.tensor as T
+#import theano.tensor as T
 
 from keras.models import Model, Sequential
 from keras.layers import Input, Convolution3D, Convolution2D, MaxPooling3D, MaxPooling2D, Dense
@@ -50,6 +50,6 @@ def convnet3d(input_shape = (1, 64, 64, 64)):
 
     model.add(Dense(1, activation = 'sigmoid'))
 
-    model.compile(loss = 'binary_crossentropy', optimizer = 'adam', metrics = ['binary_accuracy'])
+    model.compile(loss = 'binary_crossentropy', optimizer = 'adam')
 
     return model

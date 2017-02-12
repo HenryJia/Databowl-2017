@@ -7,7 +7,7 @@ import dicom
 
 import numpy as np
 import scipy
-import theano.tensor as T
+#import theano.tensor as T
 
 from preprocess import normalize, zero_center
 import models_lib as ml
@@ -33,7 +33,7 @@ x = []
 for fn in filenames:
     data = np.load(directory + 'stage1/' + fn + '/img_segment_fill.npy').astype(np.float32)
     data = zero_center(normalize(data))
-    data = scipy.ndimage.interpolation.zoom(data, np.array((64, 64, 64)) / np.array(data.shape), order = 1)
+    data = scipy.ndimage.interpolation.zoom(data, np.array((64.0, 64.0, 64.0)) / np.array(data.shape), order = 1)
 
     x += [np.expand_dims(data, axis = 0)]
 
