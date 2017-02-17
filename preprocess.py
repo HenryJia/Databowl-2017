@@ -5,17 +5,18 @@ import os
 
 import numpy as np # linear algebra
 import scipy.ndimage
-from skimage import measure, morphology
+from skimage import measure
 
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
-#from multiprocessing.pool import ThreadPool as Pool
-from multiprocessing import Pool
+from multiprocessing.pool import ThreadPool as Pool
+#from multiprocessing import Pool
 #from joblib import Parallel, delayed
 
 # Some constants 
 INPUT_FOLDER = './stage1/'
+OUTPUT_FOLDER = '/home/data/henry/Databowl-2017/stage1/'
 patients = os.listdir(INPUT_FOLDER)
 patients.sort()
 MIN_BOUND = -1000.0
@@ -55,7 +56,7 @@ def get_pixels_hu(scans):
         image = slope * image.astype(np.float64)
         image = image.astype(np.int16)
 
-    image += np.int16(intercept)
+    image = image + np.int16(intercept)
 
     return np.array(image, dtype=np.int16)
 
@@ -112,7 +113,7 @@ def plot_3d(image, threshold = -300):
     ax.set_ylim(0, p.shape[1])
     ax.set_zlim(0, p.shape[2])
 
-    plt.show()
+    plt.show(block = False)
 
 def largest_label_volume(im, bg = -1):
     vals, counts = np.unique(im, return_counts = True)
@@ -129,7 +130,7 @@ def segment_lung_mask(image, fill_lung_structures = True):
 
     # not actually binary, but 1 and 2. 
     # 0 is treated as background, which we do not want
-    binary_image = np.array(image > -320, dtype = np.int8)+1
+    binary_image = np.array(image > -320, dtype = np.int16) + 1
     labels = measure.label(binary_image)
 
     # Pick the pixel in the very corner to determine which label is air.
@@ -154,9 +155,8 @@ def segment_lung_mask(image, fill_lung_structures = True):
             if l_max is not None: #This slice contains some lung
                 binary_image[i][labeling != l_max] = 1
 
-
-    binary_image -= 1 #Make the image actual binary
-    binary_image = 1-binary_image # Invert it, lungs are now 1
+    binary_image = binary_image - 1 #Make the image actual binary
+    binary_image = 1 - binary_image # Invert it, lungs are now 1
 
     # Remove other air pockets insided body
     labels = measure.label(binary_image, background = 0)
@@ -168,8 +168,9 @@ def segment_lung_mask(image, fill_lung_structures = True):
 
 def normalize(image):
     image = (image - MIN_BOUND) / (MAX_BOUND - MIN_BOUND)
-    image[image>1] = 1.
-    image[image<0] = 0.
+    #image[image>1] = 1.
+    #image[image<0] = 0.
+    image = np.clip(image, 0.0, 1.0)
     return image
 
 def zero_center(image):
@@ -181,28 +182,28 @@ if __name__ == "__main__":
     #for k in data.keys():
     #    data[k] += [None] * len(patients)
     #for i, p in enumerate(patients):
+    if not os.path.exists(OUTPUT_FOLDER):
+        os.makedirs(OUTPUT_FOLDER)
     def process(i):
         p = patients[i]
         print('Processing patient ', i, 'ID ', p)
         scan = load_scan(INPUT_FOLDER + p)
         img = get_pixels_hu(scan)
-        #np.save(INPUT_FOLDER + p + '/img', img)
-        img, spacing = resample(img, scan)
-        #np.save(INPUT_FOLDER + p + '/img_rescale', img)
-        #np.save(INPUT_FOLDER + p + '/spacing', spacing)
+        #np.save(OUTPUT_FOLDER + p + '_img', img)
+        #img, spacing = resample(img, scan)
+        #np.save(OUTPUT_FOLDER + p + '_rescale', img)
+        #np.save(OUTPUT_FOLDER + p + '_spacing', spacing)
         mask = segment_lung_mask(img, True)
         img = mask * img
-        np.save(INPUT_FOLDER + p + '/img_segment_fill', img)
+        np.save(OUTPUT_FOLDER + p + '_segment_fill', img)
 
     pool = Pool(THREADS)
     pool.map(process, range(len(patients)))
     #Parallel(n_jobs = 24)(delayed(process)(i) for i in range(len(patients)))
     print('All Done :)')
 
-#first_patient = load_scan(INPUT_FOLDER + patients[0])
+#first_patient = load_scan('./stage1/' + patients[0])
 #first_patient_pixels = get_pixels_hu(first_patient)
 #pix_resampled, spacing = resample(first_patient_pixels, first_patient, [1,1,1])
-#print('no segfault yet')
-#segmented_lungs = segment_lung_mask(pix_resampled, False)
-#print('no segfault yet')
-#segmented_lungs_fill = segment_lung_mask(pix_resampled, True)
+#lungs_mask = segment_lung_mask(pix_resampled, False)
+#lungs_fill_mask = segment_lung_mask(pix_resampled, True)
