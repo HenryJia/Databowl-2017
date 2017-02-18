@@ -15,8 +15,8 @@ from multiprocessing.pool import ThreadPool as Pool
 #from joblib import Parallel, delayed
 
 # Some constants 
-INPUT_FOLDER = './stage1/'
-OUTPUT_FOLDER = '/home/data/henry/Databowl-2017/stage1/'
+INPUT_FOLDER = '/home/data/henry/Databowl-2017/stage1/'
+OUTPUT_FOLDER = '/home/data/henry/Databowl-2017/stage1_processed/'
 patients = os.listdir(INPUT_FOLDER)
 patients.sort()
 MIN_BOUND = -1000.0
@@ -48,15 +48,16 @@ def get_pixels_hu(scans):
     # The intercept is usually -1024, so air is approximately 0
     image[image == -2000] = 0
 
-    # Convert to Hounsfield units (HU)
-    intercept = scans[0].RescaleIntercept
-    slope = scans[0].RescaleSlope
+    for i in range(len(scans)):
+        # Convert to Hounsfield units (HU)
+        intercept = scans[i].RescaleIntercept
+        slope = scans[i].RescaleSlope
 
-    if slope != 1:
-        image = slope * image.astype(np.float64)
-        image = image.astype(np.int16)
+        if slope != 1:
+            image[i] = slope * image[i].astype(np.float64)
+            image[i] = image[i].astype(np.int16)
 
-    image = image + np.int16(intercept)
+        image[i] = image[i] + np.int16(intercept)
 
     return np.array(image, dtype=np.int16)
 
@@ -202,7 +203,8 @@ if __name__ == "__main__":
     #Parallel(n_jobs = 24)(delayed(process)(i) for i in range(len(patients)))
     print('All Done :)')
 
-#first_patient = load_scan('./stage1/' + patients[0])
+#first_patient = load_scan(INPUT_FOLDER + patients[0])
+#first_patient = load_scan(INPUT_FOLDER + '043ed6cb6054cc13804a3dca342fa4d0')
 #first_patient_pixels = get_pixels_hu(first_patient)
 #pix_resampled, spacing = resample(first_patient_pixels, first_patient, [1,1,1])
 #lungs_mask = segment_lung_mask(pix_resampled, False)
