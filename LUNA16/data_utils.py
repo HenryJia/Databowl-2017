@@ -6,21 +6,32 @@ from glob import glob
 import pandas as pd
 
 import scipy as sp
-from scipy.ndimage.interpolation import zoom
+from skimage.morphology import ball, disk, dilation, binary_erosion, remove_small_objects, erosion, closing, reconstruction, binary_closing
+from skimage.measure import label,regionprops, perimeter
+from skimage.morphology import binary_dilation, binary_opening
+from skimage.filters import roberts, sobel
+from skimage import measure, feature
+from skimage.segmentation import clear_border
+from skimage import data
+from scipy import ndimage as ndi
+
+import pylab as plt
 
 
-def mk_mask(shape, center, radius, height):
+def mk_mask(shape, center, radius):#, height):
     z, x, y = np.ogrid[:shape[0], :shape[1], :shape[2]]
 
-    cz, cx, cy = center
+    cz, cx, cy = center.astype(np.int16)
 
     r2 = (x - cx) ** 2 + (y - cy) ** 2
 
-    mask = (r2 <= radius ** 2)
-    mask = np.tile(mask, (shape[0], 1, 1))
+    mask_slice = (r2 <= radius ** 2)
+    mask = np.zeros(shape)
+    mask[cz] = mask_slice
+    #mask = np.tile(mask, (shape[0], 1, 1))
 
-    mask[:int(cz - height / 2.0)] = False
-    mask[int(cz + height / 2.0) + 1:] = False
+    #mask[:int(cz - height / 2.0)] = False
+    #mask[int(cz + height / 2.0) + 1:] = False
 
     return mask
 
@@ -44,7 +55,7 @@ def get_segmented_lungs(im, plot=False):
     '''
     Step 1: Convert into a binary image. 
     '''
-    binary = im < 604
+    binary = im < -400
     if plot == True:
         plots[0].axis('off')
         plots[0].imshow(binary, cmap=plt.cm.bone) 
@@ -111,96 +122,150 @@ def get_segmented_lungs(im, plot=False):
         plots[7].axis('off')
         plots[7].imshow(im, cmap=plt.cm.bone) 
 
-    return im
+    return im, binary
 
 class generator:
-    def __init__(self, directory, paths, targets, shape, compress, batch_size, split, validation):
+
+    # Note if batch_size means the number of CT scans to load at an iteration, actual slice numebr may be more
+
+    def __init__(self, directory, paths, targets, shape, batch_size, split, validation):
         self.directory = directory
         self.paths = paths
         self.targets = targets
         self.shape = shape
-        self.compress = compress
         self.batch_size = batch_size
         self.split = split
         self.validation = validation
 
         self.log = []
         self.outofbounds = 0
-    def __next__(self):
 
-        for s in self.shape:
-            if s is None:
-                assert self.batch_size == 1, 'batch_size must be 1 if any dimensions are variable/None'
+    def get_rand_df(self, paths, df):
+        mini_df = []
+        # some files may not have a nodule--skipping those
+        # Also, some have erroneous data, 289th has a nodule outside of the image
+        while(not len(mini_df)):
+            if self.validation:
+                k = np.random.randint(len(self.paths) - self.split, len(self.paths))
+            else:
+                k = np.random.randint(0, len(self.paths) - self.split)
 
-        data = []
-        tagets = []
-        nodes = []
-        for j in xrange(self.batch_size):
-            data = []
-            targets = []
+            img_id = paths[k].split('subset')[1][2:-4]
+            mini_df = df[self.targets['seriesuid'] == img_id] # get all nodules associate with file
 
-            node_df = []
-            k = 0
-            # some files may not have a nodule--skipping those
-            # Also, some have erroneous data, 289th has a nodule outside of the image
-            while(not len(node_df)):
-                if self.validation:
-                    k = np.random.randint(len(self.paths) - self.split, len(self.paths))
-                else:
-                    k = np.random.randint(0, len(self.paths) - self.split)
+        return k, mini_df
 
-                img_id = self.paths[k].split('subset')[1][2:-4]
-                node_df = self.targets[self.targets['seriesuid'] == img_id] #get all nodules associate with file
+    def load_img(self, path):
+        itk_img = sitk.ReadImage(path)
+        img_array = sitk.GetArrayFromImage(itk_img) # indexes are z, y, x (notice the ordering)
 
-            itk_img = sitk.ReadImage(self.paths[k])
-            img_array = sitk.GetArrayFromImage(itk_img) # indexes are z, y, x (notice the ordering)
+        return img_array, itk_img
 
-            factor = [(float(s1) / s0) if s1 else 1 for s1, s0 in zip(self.shape, img_array.shape)]
+    def get_mask(self, mini_df, itk_img, img_array):
 
-            mask = np.zeros_like(img_array)
+        mask = np.zeros_like(img_array)
+        for node_idx, cur_row in mini_df.iterrows():
+            node_x = cur_row['coordX']
+            node_y = cur_row['coordY']
+            node_z = cur_row['coordZ']
+            diam = cur_row['diameter_mm']
 
-            for i in xrange(node_df['diameter_mm'].values.shape[0]):
-                node_x = node_df['coordX'].values[i]
-                node_y = node_df['coordY'].values[i]
-                node_z = node_df['coordZ'].values[i]
-                diam = node_df['diameter_mm'].values[i]
+            origin = np.array(itk_img.GetOrigin())      # x,y,z  Origin in world coordinates (mm)
+            spacing = np.array(itk_img.GetSpacing())    # spacing of voxels in world coor. (mm)
 
-                center = np.array([node_x, node_y, node_z])   # nodule center
-                origin = np.array(itk_img.GetOrigin())      # x,y,z  Origin in world coordinates (mm)
-                spacing = np.array(itk_img.GetSpacing())    # spacing of voxels in world coor. (mm)
-                v_center = np.rint((center - origin) / spacing)  # nodule center in voxel space (still x,y,z ordering)
-                v_center = v_center[::-1] # Now z, y, x ordering
-                v_diam = np.sqrt(np.sum((float(diam) / spacing[:2]) ** 2)) # Approximate the diameter of the nodule
+            center = np.array([node_x, node_y, node_z])   # nodule center
+            v_center = np.rint((center - origin) / spacing)  # nodule center in voxel space (still x,y,z ordering)
+            v_center = v_center[::-1] # Now z, y, x ordering
 
-                if np.sum(v_center >= 0) != 3: # Check if the data makes sense, sometimes we get nodules outside of the image
-                    self.outofbounds += 1
-                    return next(self)
+            v_diam = np.sqrt(np.sum((float(diam) / spacing[:2]) ** 2)) # Approximate the diameter of the nodule
 
-                mask = np.logical_or(mask, mk_mask(img_array.shape, v_center, v_diam / 2.0, float(diam) / spacing[2]))
+            # Check if the data makes sense, sometimes we get nodules outside of the image
+            if np.sum(v_center >= 0) != 3 or np.sum(v_center < img_array.shape) != 3:
+                self.outofbounds += 1
+                continue
+
+            mask = np.logical_or(mask, mk_mask(img_array.shape, v_center, v_diam / 2.0))
+
+        return mask
+
+    def resize(self, img_array, mask, shape):
+        factor = [1] + [float(self.shape[0]) / img_array.shape[1], float(self.shape[1]) / img_array.shape[2]]
+
+        if np.sum(np.array(factor)) != 3: # Not changing anything, don't bother with the zoom call
+            img_array_resized = ndi.interpolation.zoom(img_array, factor, order = 1)
+            mask_resized = ndi.interpolation.zoom(mask, factor, order = 1)
+
+            return img_array_resized, mask_resized
+
+        else:
+            return img_array, mask
 
 
-            if np.sum(np.array(factor)) != 3: # Not changing anything, don't bother with the zoom call
-                img_array = zoom(img_array, factor, order = 1)
-                mask = zoom(mask, factor, order = 1)
+    def compress(self, img_array, mask):
+        mask_compressed = []
+        img_array_compressed = []
 
-            if self.compress:
-                mask_compressed = []
-                img_array_compressed = []
-                for i in xrange(mask.shape[0]):
-                    if np.sum(mask[i]) > 0:
-                        img_array_compressed += [img_array[i:i + 1]]
-                        mask_compressed += [mask[i:i + 1]]
-                self.log += [(k, len(node_df), np.sum(mask), v_center, v_diam / 2.0, float(diam) / spacing[2])]
-                img_array = np.concatenate(img_array_compressed, axis = 0)
-                mask = np.concatenate(mask_compressed, axis = 0)
+        for i in xrange(mask.shape[0]):
+            if np.sum(mask[i]) > 0:
+                img_array_compressed += [img_array[i:i + 1]]
+                mask_compressed += [mask[i:i + 1]]
 
-            data += [np.expand_dims(img_array, axis = 0)]
-            targets += [np.expand_dims(mask, axis = 0)]
+        #self.log += [(k, len(mini_df), np.sum(mask), v_center, v_diam / 2.0, float(diam) / spacing[2])]
 
-        data = np.concatenate(data, axis = 0)
-        targets = np.expand_dims(np.concatenate(targets, axis = 0), axis = 2)
-        targets = np.concatenate([1 - targets, targets], axis = 2)
+        return np.concatenate(img_array_compressed, axis = 0), np.concatenate(mask_compressed, axis = 0)
+
+    def __next__(self, k = None):
+
+        samples = 0
+        if k is not None: # We're doing offline preprocessing
+            img_id = self.paths[k].split('subset')[1][2:-4]
+            mini_df = self.targets[self.targets['seriesuid'] == img_id]
+            if not len(mini_df):
+                return None, None, None, None
+
+            img_array, itk_img = self.load_img(self.paths[k])
+            mask = self.get_mask(mini_df, itk_img, img_array)
+
+            if np.sum(mask) == 0:
+                return None, None, None, None
+
+            img_array, mask = self.resize(img_array, mask, self.shape)
+            img_array, mask = self.compress(img_array, mask)
+
+            img_array_original = img_array
+            binary_image = np.zeros_like(img_array).astype(np.int8)
+            for i in xrange(img_array.shape[0]):
+                img_array[i], binary_image[i] = get_segmented_lungs(img_array[i])
+
+            return img_array, mask, binary_image, img_array_original
+
+        else:
+            data = np.zeros((self.batch_size, 1) + self.shape)
+            targets = np.zeros((self.batch_size, 1) + self.shape)
+            while(samples < self.batch_size):
+
+                k, mini_df = self.get_rand_df(self.paths, self.targets)
+                img_array, itk_img = self.load_img(self.paths[k])
+                mask = self.get_mask(mini_df, itk_img, img_array)
+
+                if np.sum(mask) == 0:
+                    continue
+
+                img_array, mask = self.resize(img_array, mask, self.shape)
+                img_array, mask = self.compress(img_array, mask)
+
+                for i in xrange(img_array.shape[0]):
+                    img_array[i], _ = get_segmented_lungs(img_array[i])
+
+                remaining = min(self.batch_size - samples, mask.shape[0])
+
+                shuffle = np.random.permutation(img_array.shape[0])
+                data[samples:samples + remaining] = np.expand_dims(img_array[shuffle][:remaining], axis = 1)
+                targets[samples:samples + remaining] = np.expand_dims(mask[shuffle][:remaining], axis = 1)
+
+                samples += remaining
+
         return data, targets
 
-    def next(self):
-        return self.__next__()
+    def next(self, k = None):
+        return self.__next__(k)
