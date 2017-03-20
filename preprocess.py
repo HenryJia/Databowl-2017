@@ -1,28 +1,24 @@
 from __future__ import print_function
-#import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
 import dicom
 import os
 
-import numpy as np # linear algebra
+import numpy as np
 import scipy.ndimage
 from skimage import measure
 
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
-from multiprocessing.pool import ThreadPool as Pool
-#from multiprocessing import Pool
-#from joblib import Parallel, delayed
+from multiprocessing import Pool
 
 # Some constants 
 INPUT_FOLDER = '/home/data/henry/Databowl-2017/stage1/'
 OUTPUT_FOLDER = '/home/data/henry/Databowl-2017/stage1_processed/'
 patients = os.listdir(INPUT_FOLDER)
-patients.sort()
 MIN_BOUND = -1000.0
 MAX_BOUND = 400.0
 PIXEL_MEAN = 0.25
-THREADS = 6 * 4
+THREADS = 6
 
 # Load the scans in given folder path
 def load_scan(path):
@@ -59,7 +55,7 @@ def get_pixels_hu(scans):
 
         image[i] = image[i] + np.int16(intercept)
 
-    return np.array(image, dtype=np.int16)
+    return np.array(image, dtype = np.int16)
 
 def resample(image, scan, new_spacing = [1,1,1]):
     # Determine current pixel spacing
@@ -169,8 +165,6 @@ def segment_lung_mask(image, fill_lung_structures = True):
 
 def normalize(image):
     image = (image - MIN_BOUND) / (MAX_BOUND - MIN_BOUND)
-    #image[image>1] = 1.
-    #image[image<0] = 0.
     image = np.clip(image, 0.0, 1.0)
     return image
 
@@ -179,10 +173,6 @@ def zero_center(image):
     return image
 
 if __name__ == "__main__":
-    #data = {'img' : [], 'img_rescale' : [], 'img_segment' : [], 'img_segment_fill' : [], 'spacing' : []}
-    #for k in data.keys():
-    #    data[k] += [None] * len(patients)
-    #for i, p in enumerate(patients):
     if not os.path.exists(OUTPUT_FOLDER):
         os.makedirs(OUTPUT_FOLDER)
     def process(i):
@@ -190,17 +180,13 @@ if __name__ == "__main__":
         print('Processing patient ', i, 'ID ', p)
         scan = load_scan(INPUT_FOLDER + p)
         img = get_pixels_hu(scan)
-        #np.save(OUTPUT_FOLDER + p + '_img', img)
         #img, spacing = resample(img, scan)
-        #np.save(OUTPUT_FOLDER + p + '_rescale', img)
-        #np.save(OUTPUT_FOLDER + p + '_spacing', spacing)
         mask = segment_lung_mask(img, True)
         img = mask * img
         np.save(OUTPUT_FOLDER + p + '_segment_fill', img)
 
     pool = Pool(THREADS)
     pool.map(process, range(len(patients)))
-    #Parallel(n_jobs = 24)(delayed(process)(i) for i in range(len(patients)))
     print('All Done :)')
 
 #first_patient = load_scan(INPUT_FOLDER + patients[0])

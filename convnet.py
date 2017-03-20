@@ -2,8 +2,6 @@ from __future__ import print_function
 import os
 import random
 import time
-from collections import OrderedDict
-import dicom
 
 import numpy as np
 import scipy
@@ -49,8 +47,8 @@ print('Setup Generators')
 #train_generator = du.generator(directory + 'stage1/', targets_train, input_shape, batch_size = 1)
 #val_generator = du.generator(directory + 'stage1/', targets_val, input_shape, batch_size = 1)
 
-train_generator = du.slicewise_generator(directory + 'stage1/', targets_train, input_shape[2:])
-val_generator = du.slicewise_generator(directory + 'stage1/', targets_val, input_shape[2:])
+train_generator = du.slicewise_generator(directory + 'stage1_processed/', targets_train, input_shape[2:])
+val_generator = du.slicewise_generator(directory + 'stage1_processed/', targets_val, input_shape[2:])
 
 t0 = time.time()
 d = next(val_generator)

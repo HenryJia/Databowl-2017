@@ -8,7 +8,16 @@ import dicom
 import numpy as np
 import scipy
 
+import preprocess as pr
 from preprocess import normalize, zero_center
+
+def load_from_dicom(directory):
+    scan = pr.load_scan(directory)
+    img = pr.get_pixels_hu(scan)
+    #img, spacing = pr.resample(img, scan)
+    mask = pr.segment_lung_mask(img, True)
+    img = mask * img
+    return img
 
 class generator(object):
     def __init__(self, folder, targets, shape, batch_size):
@@ -32,6 +41,7 @@ class generator(object):
             self.log += [index]
 
             data = np.load(self.folder + list(self.targets.keys())[index] + '_img.npy').astype(np.float32)
+            #data = load_from_dicom(self.folder + list(self.targets.keys())[index]).astype(np.float32)
             data = scipy.ndimage.interpolation.zoom(data, self.shape / np.array(data.shape, dtype = np.float32), order = 1)
             #data = zero_center(normalize(data))
             data = normalize(data)
@@ -66,6 +76,7 @@ class slicewise_generator(object):
         self.log += [index]
 
         x = np.load(self.folder + list(self.targets.keys())[index] + '_img.npy').astype(np.float32)
+        #x = load_from_dicom(self.folder + list(self.targets.keys())[index]).astype(np.float32)
         x = scipy.ndimage.interpolation.zoom(x, (1, ) + tuple(self.shape / np.array(x.shape[1:], dtype = np.float32)), order = 1)
         #x = zero_center(normalize(x))
         x = zero_center(x)
