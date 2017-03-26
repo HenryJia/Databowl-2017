@@ -45,7 +45,7 @@ def run(k):
     x, y, binary_x, x_original = gen.next(k)
     return x, y, binary_x, x_original
 
-p = Pool(6)
+p = Pool(3)
 data_all = p.map(run, range(len(file_list)))
 
 data = []

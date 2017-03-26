@@ -49,54 +49,54 @@ def slicewise_convnet(input_shape = (512, 512)):
 
     blocks = []
 
-    conv = Convolution2D(2, 3, 3, border_mode = 'same')(input_var)
+    conv = Convolution2D(4, 3, 3, border_mode = 'same')(input_var)
     conv = ELU()(conv)
     blocks += [conv]
 
     conv = MaxPooling2D((2, 2))(conv) # 256
-    conv = Convolution2D(4, 3, 3, border_mode = 'same')(conv)
-    conv = ELU()(conv)
-    blocks += [conv]
-
-    conv = MaxPooling2D((2, 2))(conv) # 128
     conv = Convolution2D(8, 3, 3, border_mode = 'same')(conv)
     conv = ELU()(conv)
     blocks += [conv]
 
-    conv = MaxPooling2D((2, 2))(conv) # 64
+    conv = MaxPooling2D((2, 2))(conv) # 128
     conv = Convolution2D(16, 3, 3, border_mode = 'same')(conv)
     conv = ELU()(conv)
     blocks += [conv]
 
-    conv = MaxPooling2D((2, 2))(conv) # 32
+    conv = MaxPooling2D((2, 2))(conv) # 64
     conv = Convolution2D(32, 3, 3, border_mode = 'same')(conv)
     conv = ELU()(conv)
     blocks += [conv]
 
-    conv = MaxPooling2D((2, 2))(conv) # 16
+    conv = MaxPooling2D((2, 2))(conv) # 32
     conv = Convolution2D(64, 3, 3, border_mode = 'same')(conv)
+    conv = ELU()(conv)
+    blocks += [conv]
+
+    conv = MaxPooling2D((2, 2))(conv) # 16
+    conv = Convolution2D(128, 3, 3, border_mode = 'same')(conv)
     conv = ELU()(conv)
 
     deconv = conv
 
     deconv = merge([UpSampling2D((2, 2))(deconv), blocks[-1]], mode = 'concat', concat_axis = 1) # 32
-    deconv = Convolution2D(32, 3, 3, border_mode = 'same')(deconv)
+    deconv = Convolution2D(64, 3, 3, border_mode = 'same')(deconv)
     deconv = ELU()(deconv)
 
     deconv = merge([UpSampling2D((2, 2))(deconv), blocks[-2]], mode = 'concat', concat_axis = 1) # 64
-    deconv = Convolution2D(16, 3, 3, border_mode = 'same')(deconv)
+    deconv = Convolution2D(32, 3, 3, border_mode = 'same')(deconv)
     deconv = ELU()(deconv)
 
     deconv = merge([UpSampling2D((2, 2))(deconv), blocks[-3]], mode = 'concat', concat_axis = 1) # 128
-    deconv = Convolution2D(8, 3, 3, border_mode = 'same')(deconv)
+    deconv = Convolution2D(16, 3, 3, border_mode = 'same')(deconv)
     deconv = ELU()(deconv)
 
     deconv = merge([UpSampling2D((2, 2))(deconv), blocks[-4]], mode = 'concat', concat_axis = 1) # 256
-    deconv = Convolution2D(4, 3, 3, border_mode = 'same')(deconv)
+    deconv = Convolution2D(8, 3, 3, border_mode = 'same')(deconv)
     deconv = ELU()(deconv)
 
     deconv = merge([UpSampling2D((2, 2))(deconv), blocks[-5]], mode = 'concat', concat_axis = 1) # 512 
-    deconv = Convolution2D(2, 3, 3, border_mode = 'same')(deconv)
+    deconv = Convolution2D(4, 3, 3, border_mode = 'same')(deconv)
     deconv = ELU()(deconv)
 
     deconv = Convolution2D(1, 1, 1, border_mode = 'same', activation = 'sigmoid')(deconv)

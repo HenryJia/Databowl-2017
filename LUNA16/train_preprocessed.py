@@ -31,6 +31,10 @@ binary_imgs = np.load('/home/data/henry/Databowl-2017/LUNA16/binary_imgs.npy')
     #plt.figure(2 * i + 1)
     #plt.imshow((targets * data)[i], cmap = 'gray')
 
+shuffle = np.random.permutation(data.shape[0])
+data = data[shuffle]
+targets = targets[shuffle]
+
 data = np.expand_dims(data, axis = 1)
 targets = np.expand_dims(targets, axis = 1)
 
@@ -51,8 +55,8 @@ model = ml.slicewise_convnet()
 checkpointer = ModelCheckpoint(filepath = "luna16.hdf5", verbose = 1, save_best_only = True)
 
 print('Done, initialising training')
-model.load_weights('luna16.hdf5')
-#model.fit(data_train, targets_train, validation_data = (data_val, targets_val), nb_epoch = 100, batch_size = 2, callbacks = [checkpointer])
+#model.load_weights('luna16.hdf5')
+model.fit(data_train, targets_train, validation_data = (data_val, targets_val), nb_epoch = 100, batch_size = 2, callbacks = [checkpointer])
 
 print('Done training, evaluate on validation set')
 print(model.evaluate(data_val, targets_val))

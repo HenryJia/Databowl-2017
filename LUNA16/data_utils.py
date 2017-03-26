@@ -27,7 +27,7 @@ def mk_mask(shape, center, radius):#, height):
 
     mask_slice = (r2 <= radius ** 2)
     mask = np.zeros(shape)
-    mask[cz] = mask_slice
+    mask[np.clip(cz - 1, 0, shape[0]):np.clip(cz + 2, 0, shape[0])] = mask_slice
     #mask = np.tile(mask, (shape[0], 1, 1))
 
     #mask[:int(cz - height / 2.0)] = False

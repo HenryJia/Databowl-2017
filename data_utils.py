@@ -7,17 +7,74 @@ import dicom
 
 import numpy as np
 import scipy
+from skimage import measure
 
 import preprocess as pr
 from preprocess import normalize, zero_center
 
-def load_from_dicom(directory):
-    scan = pr.load_scan(directory)
-    img = pr.get_pixels_hu(scan)
-    #img, spacing = pr.resample(img, scan)
-    mask = pr.segment_lung_mask(img, True)
-    img = mask * img
-    return img
+import pylab as plt
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+#plt.ion()
+
+def load_scan(path):
+    slices = [dicom.read_file(path + '/' + s) for s in os.listdir(path)]
+    slices.sort(key = lambda x: int(x.InstanceNumber))
+    try:
+        slice_thickness = np.abs(slices[0].ImagePositionPatient[2] - slices[1].ImagePositionPatient[2])
+    except:
+        slice_thickness = np.abs(slices[0].SliceLocation - slices[1].SliceLocation)
+
+    for s in slices:
+        s.SliceThickness = slice_thickness
+
+    return slices
+
+def get_pixels_hu(scans):
+    image = np.stack([s.pixel_array for s in scans])
+    # Convert to int16 (from sometimes int16), 
+    # should be possible as values should always be low enough (<32k)
+    image = image.astype(np.int16)
+
+    # Set outside-of-scan pixels to 0
+    # The intercept is usually -1024, so air is approximately 0
+    image[image == -2000] = 0
+
+    for i in range(len(scans)):
+        # Convert to Hounsfield units (HU)
+        intercept = scans[i].RescaleIntercept
+        slope = scans[i].RescaleSlope
+
+        if slope != 1:
+            image[i] = slope * image[i].astype(np.float64)
+            image[i] = image[i].astype(np.int16)
+
+        image[i] = image[i] + np.int16(intercept)
+
+    return np.array(image, dtype = np.int16)
+
+def plot_3d(image, threshold = -300):
+
+    # Position the scan upright, 
+    # so the head of the patient would be at the top facing the camera
+    p = image.transpose(2,1,0)
+    p = p[:,:,::-1]
+
+    verts, faces = measure.marching_cubes(p, threshold)
+
+    fig = plt.figure(figsize = (10, 10))
+    ax = fig.add_subplot(111, projection = '3d')
+
+    # Fancy indexing: `verts[faces]` to generate a collection of triangles
+    mesh = Poly3DCollection(verts[faces], alpha = 0.1)
+    face_color = [0.5, 0.5, 1]
+    mesh.set_facecolor(face_color)
+    ax.add_collection3d(mesh)
+
+    ax.set_xlim(0, p.shape[0])
+    ax.set_ylim(0, p.shape[1])
+    ax.set_zlim(0, p.shape[2])
+
+    plt.show(block = False)
 
 class generator(object):
     def __init__(self, folder, targets, shape, batch_size):
@@ -60,31 +117,25 @@ class generator(object):
         return self.__next__()
 
 class slicewise_generator(object):
-    def __init__(self, folder, targets, shape):
+    def __init__(self, folder, targets, preprocess_func):
         assert type(targets) is dict or type(targets) is OrderedDict, 'Targets must be a dictionary or ordered dictionary'
 
         self.folder = folder
         self.targets = targets
-        self.shape = shape
 
         self.log = []
 
     def __next__(self):
-        y = np.zeros((1, 2), dtype = np.uint8)
+        y = np.zeros((1, 1), dtype = np.uint8)
 
         index = random.randint(0, len(self.targets.keys()) - 1)
         self.log += [index]
 
         x = np.load(self.folder + list(self.targets.keys())[index] + '_img.npy').astype(np.float32)
-        #x = load_from_dicom(self.folder + list(self.targets.keys())[index]).astype(np.float32)
-        x = scipy.ndimage.interpolation.zoom(x, (1, ) + tuple(self.shape / np.array(x.shape[1:], dtype = np.float32)), order = 1)
-        #x = zero_center(normalize(x))
-        x = zero_center(x)
 
         x = np.reshape(x, (1, x.shape[0], 1) + x.shape[1:])
-        #print(x.shape)
 
-        y[0, self.targets[list(self.targets.keys())[index]]] = 1
+        y = self.targets
 
         return x, y
 
