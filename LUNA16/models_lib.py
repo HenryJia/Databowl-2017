@@ -3,8 +3,8 @@ from __future__ import print_function
 import numpy as np
 
 from keras.models import Sequential, Model
-from keras.layers import Input, TimeDistributed, Lambda, merge, Activation, Flatten
-from keras.layers import Convolution2D, Convolution3D
+from keras.layers import Input, TimeDistributed, Lambda, concatenate, Activation, Flatten
+from keras.layers import Conv2D, Conv3D
 from keras.layers import AveragePooling2D, AveragePooling3D, MaxPooling2D, MaxPooling3D
 from keras.layers import UpSampling2D, UpSampling3D
 from keras.layers import GlobalAveragePooling2D, GlobalMaxPooling2D
@@ -49,59 +49,59 @@ def slicewise_convnet(input_shape = (512, 512)):
 
     blocks = []
 
-    conv = Convolution2D(4, 3, 3, border_mode = 'same')(input_var)
+    conv = Conv2D(4, (3, 3), padding = 'same')(input_var)
     conv = ELU()(conv)
     blocks += [conv]
 
     conv = MaxPooling2D((2, 2))(conv) # 256
-    conv = Convolution2D(8, 3, 3, border_mode = 'same')(conv)
+    conv = Conv2D(8, (3, 3), padding = 'same')(conv)
     conv = ELU()(conv)
     blocks += [conv]
 
     conv = MaxPooling2D((2, 2))(conv) # 128
-    conv = Convolution2D(16, 3, 3, border_mode = 'same')(conv)
+    conv = Conv2D(16, (3, 3), padding = 'same')(conv)
     conv = ELU()(conv)
     blocks += [conv]
 
     conv = MaxPooling2D((2, 2))(conv) # 64
-    conv = Convolution2D(32, 3, 3, border_mode = 'same')(conv)
+    conv = Conv2D(32, (3, 3), padding = 'same')(conv)
     conv = ELU()(conv)
     blocks += [conv]
 
     conv = MaxPooling2D((2, 2))(conv) # 32
-    conv = Convolution2D(64, 3, 3, border_mode = 'same')(conv)
+    conv = Conv2D(64, (3, 3), padding = 'same')(conv)
     conv = ELU()(conv)
     blocks += [conv]
 
     conv = MaxPooling2D((2, 2))(conv) # 16
-    conv = Convolution2D(128, 3, 3, border_mode = 'same')(conv)
+    conv = Conv2D(128, (3, 3), padding = 'same')(conv)
     conv = ELU()(conv)
 
     deconv = conv
 
-    deconv = merge([UpSampling2D((2, 2))(deconv), blocks[-1]], mode = 'concat', concat_axis = 1) # 32
-    deconv = Convolution2D(64, 3, 3, border_mode = 'same')(deconv)
+    deconv = concatenate([UpSampling2D((2, 2))(deconv), blocks[-1]], axis = 1) # 32
+    deconv = Conv2D(64, (3, 3), padding = 'same')(deconv)
     deconv = ELU()(deconv)
 
-    deconv = merge([UpSampling2D((2, 2))(deconv), blocks[-2]], mode = 'concat', concat_axis = 1) # 64
-    deconv = Convolution2D(32, 3, 3, border_mode = 'same')(deconv)
+    deconv = concatenate([UpSampling2D((2, 2))(deconv), blocks[-2]], axis = 1) # 64
+    deconv = Conv2D(32, (3, 3), padding = 'same')(deconv)
     deconv = ELU()(deconv)
 
-    deconv = merge([UpSampling2D((2, 2))(deconv), blocks[-3]], mode = 'concat', concat_axis = 1) # 128
-    deconv = Convolution2D(16, 3, 3, border_mode = 'same')(deconv)
+    deconv = concatenate([UpSampling2D((2, 2))(deconv), blocks[-3]], axis = 1) # 128
+    deconv = Conv2D(16, (3, 3), padding = 'same')(deconv)
     deconv = ELU()(deconv)
 
-    deconv = merge([UpSampling2D((2, 2))(deconv), blocks[-4]], mode = 'concat', concat_axis = 1) # 256
-    deconv = Convolution2D(8, 3, 3, border_mode = 'same')(deconv)
+    deconv = concatenate([UpSampling2D((2, 2))(deconv), blocks[-4]], axis = 1) # 256
+    deconv = Conv2D(8, (3, 3), padding = 'same')(deconv)
     deconv = ELU()(deconv)
 
-    deconv = merge([UpSampling2D((2, 2))(deconv), blocks[-5]], mode = 'concat', concat_axis = 1) # 512 
-    deconv = Convolution2D(4, 3, 3, border_mode = 'same')(deconv)
+    deconv = concatenate([UpSampling2D((2, 2))(deconv), blocks[-5]], axis = 1) # 512 
+    deconv = Conv2D(4, (3, 3), padding = 'same')(deconv)
     deconv = ELU()(deconv)
 
-    deconv = Convolution2D(1, 1, 1, border_mode = 'same', activation = 'sigmoid')(deconv)
+    deconv = Conv2D(1, (1, 1), padding = 'same', activation = 'sigmoid')(deconv)
 
-    model = Model(input = input_var, output = deconv)
+    model = Model(inputs = input_var, outputs = deconv)
     model.compile(loss = dice_coef_loss, optimizer = Adam(lr=1.0e-5), metrics = [dice_coef])
 
     return model
@@ -109,34 +109,34 @@ def slicewise_convnet(input_shape = (512, 512)):
 def convnet_3d(input_shape = (64, 64, 64)):
     model = Sequential()
 
-    model.add(Convolution3D(4, 3, 3, 3, border_mode = 'same', input_shape = (1, ) + input_shape))
+    model.add(Conv3D(4, (3, 3, 3), padding = 'same', input_shape = (1, ) + input_shape))
     model.add(ELU())
     model.add(MaxPooling3D((2, 2, 2)))
 
-    model.add(Convolution3D(8, 3, 3, 3, border_mode = 'same'))
+    model.add(Conv3D(8, (3, 3, 3), padding = 'same'))
     model.add(ELU())
     model.add(MaxPooling3D((2, 2, 2)))
 
-    model.add(Convolution3D(16, 3, 3, 3, border_mode = 'same'))
+    model.add(Conv3D(16, (3, 3, 3), padding = 'same'))
     model.add(ELU())
     model.add(MaxPooling3D((2, 2, 2)))
 
-    model.add(Convolution3D(32, 3, 3, 3, border_mode = 'same'))
+    model.add(Conv3D(32, (3, 3, 3), padding = 'same'))
     model.add(ELU())
     model.add(MaxPooling3D((2, 2, 2)))
 
-    model.add(Convolution3D(64, 3, 3, 3, border_mode = 'same'))
+    model.add(Conv3D(64, (3, 3, 3), padding = 'same'))
     model.add(ELU())
     model.add(MaxPooling3D((2, 2, 2)))
 
-    model.add(Convolution3D(64, 3, 3, 3, border_mode = 'same'))
+    model.add(Conv3D(64, (3, 3, 3), padding = 'same'))
     model.add(ELU())
     model.add(MaxPooling3D((2, 2, 2)))
 
     # Equivalent of Dense, but for the sake of invariance to dimensions at runtime, we use conv
-    model.add(Convolution3D(128, 1, 1, 1, border_mode = 'same'))
+    model.add(Conv3D(128, 1, 1, 1, padding = 'same'))
     model.add(ELU())
-    model.add(Convolution3D(2, 1, 1, 1, border_mode = 'same'))
+    model.add(Conv3D(2, 1, 1, 1, padding = 'same'))
 
     model_flat = model
     model_flat.add(Flatten())

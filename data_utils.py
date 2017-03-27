@@ -1,6 +1,5 @@
 from __future__ import print_function
 import os
-import random
 import time
 from collections import OrderedDict
 import dicom
@@ -116,26 +115,26 @@ class generator(object):
     def next(self):
         return self.__next__()
 
-class slicewise_generator(object):
+class custom_generator(object):
     def __init__(self, folder, targets, preprocess_func):
-        assert type(targets) is dict or type(targets) is OrderedDict, 'Targets must be a dictionary or ordered dictionary'
 
         self.folder = folder
         self.targets = targets
+        self.preprocess_func = preprocess_func
 
         self.log = []
 
     def __next__(self):
         y = np.zeros((1, 1), dtype = np.uint8)
 
-        index = random.randint(0, len(self.targets.keys()) - 1)
+        index = np.random.randint(0, len(self.targets))
         self.log += [index]
 
-        x = np.load(self.folder + list(self.targets.keys())[index] + '_img.npy').astype(np.float32)
+        x = get_pixels_hu(load_scan(self.folder + 'stage1/' + self.targets['id'].iloc[index]))
+        x = self.preprocess_func(x, self.targets, index)
+        x = np.expand_dims(x, axis = 0)
 
-        x = np.reshape(x, (1, x.shape[0], 1) + x.shape[1:])
-
-        y = self.targets
+        y = np.array(self.targets['cancer'].iloc[index]).reshape((1, 1))
 
         return x, y
 

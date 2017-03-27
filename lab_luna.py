@@ -65,7 +65,7 @@ print('Healthy patients')
 for k in xrange(len(healthy_df)):
     if k % 10 == 0:
         print(k)
-    out_healthy = np.round(cycle(2, k))
+    out_healthy = np.round(cycle(healthy_df, k))
     healthy_slice[k] = out_healthy[np.argmax(np.sum(out_healthy, axis = (1, 2)))]
     healthy_stats[k] = np.unique(out_healthy, return_counts = True)[1] / np.prod(out_healthy.shape).astype(np.float32)
 

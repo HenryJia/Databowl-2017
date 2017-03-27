@@ -47,9 +47,9 @@ checkpointer = ModelCheckpoint(filepath = "luna16.hdf5", verbose = 1, save_best_
 
 print('Done, initialising training')
 model.load_weights('luna16.hdf5')
-model.fit_generator(train_generator, samples_per_epoch = 800, nb_epoch = 100,
-                    validation_data = val_generator, nb_val_samples = 50,
-                    max_q_size = 100, nb_worker = 6, pickle_safe = True,
+model.fit_generator(train_generator, steps_per_epoch = 800 / 4, epochs = 100,
+                    validation_data = val_generator, validation_steps = 16,
+                    max_q_size = 100, workers = 6, pickle_safe = True,
                     callbacks = [checkpointer])
 #out = model.predict(d[0])
 
