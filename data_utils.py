@@ -132,9 +132,10 @@ class custom_generator(object):
 
         x = get_pixels_hu(load_scan(self.folder + 'stage1/' + self.targets['id'].iloc[index]))
         x = self.preprocess_func(x, self.targets, index)
-        x = np.expand_dims(x, axis = 0)
+        x = np.expand_dims(x, axis = 1)
 
         y = np.array(self.targets['cancer'].iloc[index]).reshape((1, 1))
+        y = np.tile(y, (x.shape[0], 1))
 
         return x, y
 

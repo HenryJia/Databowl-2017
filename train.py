@@ -24,6 +24,7 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 plt.ion()
 
 val_split = 50
+batch_size = 4
 
 print('Load Targets')
 
@@ -68,6 +69,13 @@ def preprocess_loadmask(img, df, k):
     mask = np.load(mask_directory + 'stage1_nodules/' + df['id'].iloc[k] + '.npy')
     out = np.round(mask) * img
 
+    # Compress by removing all 0 slices to save memory
+    out = out[np.sum(out, axis = (1, 2)) != 0]
+
+    # Sample only batch_size
+    np.random.shuffle(out)
+    out = out[:batch_size]
+
     return out
 
 print('Setup Generators')
@@ -88,8 +96,8 @@ checkpointer = ModelCheckpoint(
 
 print('Training')
 
-model.fit_generator(train_generator, steps_per_epoch = 128, epochs = 30, callbacks = [checkpointer],
-                    validation_data = val_generator, validation_steps = 128, max_q_size = 20, workers = 6, pickle_safe = True)
+model.fit_generator(train_generator, steps_per_epoch = 256, epochs = 30, callbacks = [checkpointer],
+                    validation_data = val_generator, validation_steps = 32, max_q_size = 20, workers = 6, pickle_safe = True)
 
 #for k in xrange(20):
     #pb = Progbar(len(targets_train) + 1)

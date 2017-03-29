@@ -14,6 +14,23 @@ from keras.optimizers import Adam
 
 import keras.backend as K
 
+def np_dice_coef(y_true, y_pred):
+    smooth = 1.
+    y_true_f = y_true.flatten()
+    y_pred_f = y_pred.flatten()
+    intersection = np.sum(y_true_f * y_pred_f)
+    return (2. * intersection + smooth) / (np.sum(y_true_f) + np.sum(y_pred_f) + smooth)
+
+def dice_coef(y_true, y_pred):
+    smooth = 1.
+    y_true_f = K.flatten(y_true)
+    y_pred_f = K.flatten(y_pred)
+    intersection = K.sum(y_true_f * y_pred_f)
+    return (2. * intersection + smooth) / (K.sum(y_true_f) + K.sum(y_pred_f) + smooth)
+
+def dice_coef_loss(y_true, y_pred):
+    return -dice_coef(y_true, y_pred)
+
 def convnet3d(input_shape = (64, 64, 64)):
 
     model = Sequential()
@@ -75,63 +92,63 @@ def convnet3d(input_shape = (64, 64, 64)):
 
     return model
 
-def slicewise_convnet(input_shape = (None, 512, 512)):
+def slicewise_convnet(input_shape = (512, 512)):
 
     model = Sequential()
 
-    model.add(Lambda(lambda x: x.dimshuffle((0, 1, 'x', 2, 3)), lambda input_shape: input_shape[:2] + (1, ) + input_shape[2:],
-                     batch_input_shape = (1, ) + input_shape))
+    #model.add(Lambda(lambda x: x.dimshuffle((0, 1, 'x', 2, 3)), lambda input_shape: input_shape[:2] + (1, ) + input_shape[2:],
+                     #batch_input_shape = (1, ) + input_shape))
     #print(model.output_shape)
-    model.add(TimeDistributed(Conv2D(2, (3, 3), padding = 'same')))
+    model.add(Conv2D(2, (3, 3), padding = 'same', input_shape = (1, ) + input_shape))
     model.add(ELU())
-    model.add(TimeDistributed(MaxPooling2D((2, 2))))
+    model.add(MaxPooling2D((2, 2)))
 
-    model.add(TimeDistributed(Conv2D(4, (3, 3), padding = 'same')))
+    model.add(Conv2D(4, (3, 3), padding = 'same'))
     model.add(ELU())
-    model.add(TimeDistributed(MaxPooling2D((2, 2))))
+    model.add(MaxPooling2D((2, 2)))
 
-    model.add(TimeDistributed(Conv2D(8, (3, 3), padding = 'same')))
+    model.add(Conv2D(8, (3, 3), padding = 'same'))
     model.add(ELU())
-    model.add(TimeDistributed(MaxPooling2D((2, 2))))
+    model.add(MaxPooling2D((2, 2)))
 
-    model.add(TimeDistributed(Conv2D(16, (3, 3), padding = 'same')))
+    model.add(Conv2D(16, (3, 3), padding = 'same'))
     model.add(ELU())
-    model.add(TimeDistributed(MaxPooling2D((2, 2))))
+    model.add(MaxPooling2D((2, 2)))
 
-    model.add(TimeDistributed(Conv2D(32, (3, 3), padding = 'same')))
+    model.add(Conv2D(32, (3, 3), padding = 'same'))
     model.add(ELU())
-    model.add(TimeDistributed(Conv2D(32, (3, 3), padding = 'same')))
+    model.add(Conv2D(32, (3, 3), padding = 'same'))
     model.add(ELU())
-    model.add(TimeDistributed(MaxPooling2D((2, 2))))
+    model.add(MaxPooling2D((2, 2)))
 
-    model.add(TimeDistributed(Conv2D(32, (3, 3), padding = 'same')))
+    model.add(Conv2D(32, (3, 3), padding = 'same'))
     model.add(ELU())
-    model.add(TimeDistributed(Conv2D(32, (3, 3), padding = 'same')))
+    model.add(Conv2D(32, (3, 3), padding = 'same'))
     model.add(ELU())
-    model.add(TimeDistributed(MaxPooling2D((2, 2))))
+    model.add(MaxPooling2D((2, 2)))
 
-    model.add(TimeDistributed(Conv2D(32, (3, 3), padding = 'same')))
+    model.add(Conv2D(32, (3, 3), padding = 'same'))
     model.add(ELU())
-    model.add(TimeDistributed(Conv2D(32, (3, 3), padding = 'same')))
+    model.add(Conv2D(32, (3, 3), padding = 'same'))
     model.add(ELU())
-    model.add(TimeDistributed(MaxPooling2D((2, 2))))
+    model.add(MaxPooling2D((2, 2)))
 
-    model.add(TimeDistributed(Conv2D(32, (3, 3), padding = 'same')))
+    model.add(Conv2D(32, (3, 3), padding = 'same'))
     model.add(ELU())
-    model.add(TimeDistributed(Conv2D(32, (3, 3), padding = 'same')))
+    model.add(Conv2D(32, (3, 3), padding = 'same'))
     model.add(ELU())
-    model.add(TimeDistributed(MaxPooling2D((2, 2))))
+    model.add(MaxPooling2D((2, 2)))
 
-    model.add(TimeDistributed(Flatten()))
+    model.add(Flatten())
 
-    model.add(GlobalAveragePooling1D())
-
+    model.add(Dense(256))
+    model.add(ELU())
     model.add(Dense(32))
     model.add(ELU())
-    model.add(Dropout(0.5))
 
     model.add(Dense(1, activation = 'sigmoid'))
 
-    model.compile(loss = 'binary_crossentropy', optimizer = Adam(lr = 1e-5))
+    #model.compile(loss = 'binary_crossentropy', optimizer = Adam(lr = 1e-5))
+    model.compile(loss = dice_coef_loss, optimizer = Adam(lr = 1e-5), metrics = [dice_coef])
 
     return model
