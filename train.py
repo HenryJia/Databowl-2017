@@ -66,8 +66,8 @@ model = ml.slicewise_convnet()
     #return out
 
 def preprocess_loadmask(img, df, k):
-    mask = np.load(mask_directory + 'stage1_nodules/' + df['id'].iloc[k] + '.npy')
-    out = np.round(mask) * img
+    mask = np.round(np.load(mask_directory + 'stage1_nodules/' + df['id'].iloc[k] + '.npy')
+    out = mask * img
 
     # Compress by removing all 0 slices to save memory
     out = out[np.sum(out, axis = (1, 2)) != 0]

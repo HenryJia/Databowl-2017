@@ -31,22 +31,30 @@ def dice_coef(y_true, y_pred):
 def dice_coef_loss(y_true, y_pred):
     return -dice_coef(y_true, y_pred)
 
-def convnet3d(input_shape = (64, 64, 64)):
+def convnet3d(input_shape = (32, 32, 32)):
 
     model = Sequential()
 
+    model.add(Conv3D(2, (3, 3, 3), padding = 'same', input_shape = (1, ) + input_shape))
+    model.add(ELU())
     model.add(Conv3D(2, (3, 3, 3), padding = 'same', input_shape = (1, ) + input_shape))
     model.add(ELU())
     model.add(MaxPooling3D((2, 2, 2)))
 
     model.add(Conv3D(4, (3, 3, 3), padding = 'same'))
     model.add(ELU())
+    model.add(Conv3D(4, (3, 3, 3), padding = 'same'))
+    model.add(ELU())
     model.add(MaxPooling3D((2, 2, 2)))
 
     model.add(Conv3D(8, (3, 3, 3), padding = 'same'))
     model.add(ELU())
+    model.add(Conv3D(8, (3, 3, 3), padding = 'same'))
+    model.add(ELU())
     model.add(MaxPooling3D((2, 2, 2)))
 
+    model.add(Conv3D(16, (3, 3, 3), padding = 'same'))
+    model.add(ELU())
     model.add(Conv3D(16, (3, 3, 3), padding = 'same'))
     model.add(ELU())
     model.add(MaxPooling3D((2, 2, 2)))
@@ -55,33 +63,11 @@ def convnet3d(input_shape = (64, 64, 64)):
     model.add(ELU())
     model.add(Conv3D(32, (3, 3, 3), padding = 'same'))
     model.add(ELU())
-    model.add(MaxPooling3D((2, 2, 2)))
-
-    model.add(Conv3D(32, (3, 3, 3), padding = 'same'))
-    model.add(ELU())
-    model.add(Conv3D(32, (3, 3, 3), padding = 'same'))
-    model.add(ELU())
-    model.add(MaxPooling3D((2, 2, 2)))
-
-    model.add(Conv3D(32, (3, 3, 3), padding = 'same'))
-    model.add(ELU())
-    model.add(Conv3D(32, (3, 3, 3), padding = 'same'))
-    model.add(ELU())
-    model.add(MaxPooling3D((2, 2, 2)))
-
-    model.add(Conv3D(32, (3, 3, 3), padding = 'same'))
-    model.add(ELU())
-    model.add(Conv3D(32, (3, 3, 3), padding = 'same'))
-    model.add(ELU())
-    model.add(MaxPooling3D((2, 2, 2)))
 
     #model.add(GlobalMaxPooling3D())
 
     model.add(Flatten())
 
-    model.add(Dense(128))
-    model.add(ELU())
-    model.add(Dropout(0.5))
     model.add(Dense(128))
     model.add(ELU())
     model.add(Dropout(0.5))
@@ -149,6 +135,6 @@ def slicewise_convnet(input_shape = (512, 512)):
     model.add(Dense(1, activation = 'sigmoid'))
 
     #model.compile(loss = 'binary_crossentropy', optimizer = Adam(lr = 1e-5))
-    model.compile(loss = dice_coef_loss, optimizer = Adam(lr = 1e-5), metrics = [dice_coef])
+    model.compile(loss = 'binary_crossentropy', optimizer = 'adam', metrics = ['accuracy', dice_coef])
 
     return model

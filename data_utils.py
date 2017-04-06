@@ -116,11 +116,12 @@ class generator(object):
         return self.__next__()
 
 class custom_generator(object):
-    def __init__(self, folder, targets, preprocess_func):
+    def __init__(self, folder, targets, preprocess_func, softmax = False):
 
         self.folder = folder
         self.targets = targets
         self.preprocess_func = preprocess_func
+        self.softmax = softmax
 
         self.log = []
 
@@ -136,6 +137,8 @@ class custom_generator(object):
 
         y = np.array(self.targets['cancer'].iloc[index]).reshape((1, 1))
         y = np.tile(y, (x.shape[0], 1))
+        if self.softmax:
+            y = np.concatenate([1 - y, y], axis = 1)
 
         return x, y
 
